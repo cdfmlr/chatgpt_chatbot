@@ -1,5 +1,5 @@
 from datetime import datetime
-from chatgpt import ChatGPT
+from chatbot import ChatGPT
 import aiohttp
 from aiohttp.web import Request, Response
 
@@ -21,12 +21,11 @@ class ChatGPTHTTPServer:
         """
         body = await request.json()
 
-
         prompt = body.get("prompt", None)
         if prompt == None:
             return aiohttp.web.Response(text="prompt is required", status=400)
 
-        print(f'{datetime.now()} [POST /ask] asking ChatGPT: {prompt}') 
+        print(f'{datetime.now()} [POST /ask] asking ChatGPT: {prompt}')
 
         try:
             response = self.chatgpt.ask(prompt)
@@ -47,7 +46,8 @@ class ChatGPTHTTPServer:
         if access_token == None:
             return aiohttp.web.Response(text="access_token is required", status=400)
 
-        print(f'{datetime.now()} [POST /renew] renewing access token: {access_token[:5] + "***" + access_token[-5:]}')  
+        print(
+            f'{datetime.now()} [POST /renew] renewing access token: {access_token[:5] + "***" + access_token[-5:]}')
 
         self.chatgpt.renew(access_token)
         return aiohttp.web.Response(text="ok")
@@ -61,7 +61,17 @@ class ChatGPTHTTPServer:
         aiohttp.web.run_app(app, host=self.host, port=self.port)
 
 
-if __name__ == "__main__":
+def serveHTTP(address: str = "localhost:9006"):
+    try:
+        host, port = address.split(":")
+        port = int(port)
+    except:
+        raise ValueError("address should be in format of host:port")
+
     chatgpt = ChatGPT()
-    server = ChatGPTHTTPServer(chatgpt)
+    server = ChatGPTHTTPServer(chatgpt, host, port)
     server.run()
+
+
+if __name__ == "__main__":
+    serveHTTP()

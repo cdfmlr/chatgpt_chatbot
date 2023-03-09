@@ -1,11 +1,11 @@
 from datetime import datetime
-from chatbot import ChatGPT
+from chatbot import ChatGPTv1
 import aiohttp
 from aiohttp.web import Request, Response
 
 
 class ChatGPTHTTPServer:
-    def __init__(self, chatgpt: ChatGPT, host: str = "localhost", port: int = 9006):
+    def __init__(self, chatgpt: ChatGPTv1, host: str = "localhost", port: int = 9006):
         self.chatgpt = chatgpt
         self.host = host
         self.port = port
@@ -68,7 +68,7 @@ def serveHTTP(address: str = "localhost:9006"):
     except:
         raise ValueError("address should be in format of host:port")
 
-    chatgpt = ChatGPT()
+    chatgpt = ChatGPTv1()
     server = ChatGPTHTTPServer(chatgpt, host, port)
     server.run()
 

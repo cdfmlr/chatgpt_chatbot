@@ -47,20 +47,20 @@ options:
 ### 请求
 
 ```sh
-$ grpcurl -d '{"access_token": "eyJ***99A", "initial_prompt": "..."}' -plaintext localhost:50052 muvtuber.chatbot.chatgpt_chatbot.v1.ChatGPTService.NewSession
-
+$ grpcurl -d '{"config": "{\"version\": 3, \"api_key\": \"sk-xxxx\"}", "initial_prompt": "你好"}' -plaintext localhost:50052 muvtuber.chatbot.v2.ChatbotService.NewSession
 {
-  "sessionId": "b7268187-ab7a-4e2d-9d4a-0161975369bd"
+  "sessionId": "2617613c-9f20-4d6c-b47e-1622392a134e",
+  "initialResponse": "你好！我很高兴能和你交流。有什么我可以帮助你的吗？"
 }
 
-$ grpcurl -d '{"session_id": "b7268187-ab7a-4e2d-9d4a-0161975369bd", "prompt": "hello!!"}' -plaintext localhost:50052 muvtuber.chatbot.chatgpt_chatbot.v1.ChatGPTService.Chat
+$ grpcurl -d '{"session_id": "2617613c-9f20-4d6c-b47e-1622392a134e", "prompt": "hello!!"}' -plaintext localhost:50052 muvtuber.chatbot.v2.ChatbotService.Chat
 {
   "response": "Hello! How can I assist you today?"
 }
 
-$ grpcurl -d '{"session_id": "b7268187-ab7a-4e2d-9d4a-0161975369bd"}' -plaintext localhost:50052 muvtuber.chatbot.chatgpt_chatbot.v1.ChatGPTService.DeleteSession
+$ grpcurl -d '{"session_id": "2617613c-9f20-4d6c-b47e-1622392a134e"}' -plaintext localhost:50052 muvtuber.chatbot.v2.ChatbotService.DeleteSession
 {
-  "sessionId": "b7268187-ab7a-4e2d-9d4a-0161975369bd"
+  "sessionId": "2617613c-9f20-4d6c-b47e-1622392a134e"
 }
 ```
 
@@ -68,7 +68,7 @@ $ grpcurl -d '{"session_id": "b7268187-ab7a-4e2d-9d4a-0161975369bd"}' -plaintext
 
 ```md
 - NewSession
-    - INVALID_ARGUMENT: access_token is required
+    - INVALID_ARGUMENT: version & access_token|api_key is required
     - RESOURCE_EXHAUSTED: TooManySessions (该系统内 MultiChatGPT 的最大会话数限制)
     - UNAVAILABLE: ChatGPTError (向 ChatGPT 请求 initial_prompt 时出错)
 - Chat

@@ -17,11 +17,12 @@ def cooldown(seconds: int):
         last_called = 0
 
         def wrapper(*args, **kwargs):
-            nonlocal last_called
-            now = datetime.now().timestamp()
-            if now - last_called < seconds:
-                raise CooldownException(int(seconds - now + last_called))
-            last_called = now
+            if not kwargs.get('no_cooldown', False):  # no no_cooldown: do it
+                nonlocal last_called
+                now = datetime.now().timestamp()
+                if now - last_called < seconds:
+                    raise CooldownException(int(seconds - now + last_called))
+                last_called = now
             return func(*args, **kwargs)
 
         return wrapper

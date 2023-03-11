@@ -24,7 +24,7 @@ from cooldown import cooldown
 
 class ChatGPT(metaclass=ABCMeta):
     @abstractmethod
-    def ask(self, session_id, prompt):
+    def ask(self, session_id, prompt, **kwargs):
         """Ask ChatGPT with prompt, return response text
 
         Raises:
@@ -43,14 +43,14 @@ class ChatGPTv1(ChatGPT):
 
         q = config.get('initial_prompt', None)
         if q:
-            a = self.ask('', q)
+            a = self.ask('', q, no_cooldown=True)
             print(f'{datetime.now()} ChatGPT initial ask: {q} -> {a}')
             self.initial_response = a
         else:
             self.initial_response = None
 
     @cooldown(os.getenv("CHATGPT_COOLDOWN", 75))
-    def ask(self, session_id, prompt) -> str:  # raises Exception
+    def ask(self, session_id, prompt, **kwargs) -> str:  # raises Exception
         """Ask ChatGPT with prompt, return response text
 
         - session_id: unused
@@ -93,7 +93,7 @@ class ChatGPTv3(ChatGPT):
 
         q = config.get('initial_prompt', None)
         if q:
-            a = self.ask('', q)
+            a = self.ask('', q, no_cooldown=True)
             logging.info(f'ChatGPT initial ask: {q} -> {a}')
             self.initial_response = a
         else:
@@ -105,7 +105,7 @@ class ChatGPTv3(ChatGPT):
     # 主要是价格w
     # gpt-3.5-turbo: $0.002 / 1K tokens
     @cooldown(os.getenv("CHATGPT_V3_COOLDOWN", 30))
-    def ask(self, session_id, prompt) -> str:  # raises Exception
+    def ask(self, session_id, prompt, **kwargs) -> str:  # raises Exception
         """Ask ChatGPT with prompt, return response text
 
         - session_id: unused
@@ -187,7 +187,7 @@ class MultiChatGPT(ChatGPT):
 
         return session_id
 
-    def ask(self, session_id: str, prompt: str) -> str:  # raises ChatGPTError
+    def ask(self, session_id: str, prompt: str, **kwargs) -> str:  # raises ChatGPTError
         """Ask ChatGPT with session_id and prompt, return response text
 
         Raises:

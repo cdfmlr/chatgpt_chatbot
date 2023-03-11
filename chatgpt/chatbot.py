@@ -3,6 +3,7 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 import os
 from enum import Enum
+import time
 from typing import Dict
 import uuid
 from warnings import warn
@@ -10,7 +11,7 @@ from revChatGPT.V1 import Chatbot as ChatbotV1
 from revChatGPT.V3 import Chatbot as ChatbotV3
 import threading
 from datetime import datetime
-
+from threading import Timer
 from cooldown import cooldown
 
 # Proxy server Rate limit: 25 requests per 10 seconds (per IP)
@@ -99,11 +100,11 @@ class ChatGPTv3(ChatGPT):
         else:
             self.initial_response = None
 
-
     # Rate Limits: 20 RPM / 40,000 TPM
     # https://platform.openai.com/docs/guides/rate-limits/overview
     # 主要是价格w
     # gpt-3.5-turbo: $0.002 / 1K tokens
+
     @cooldown(os.getenv("CHATGPT_V3_COOLDOWN", 30))
     def ask(self, session_id, prompt, **kwargs) -> str:  # raises Exception
         """Ask ChatGPT with prompt, return response text
@@ -150,6 +151,64 @@ class ChatGPTConfig:
 MAX_SESSIONS = 10
 
 
+class ChatGPTProxy(ChatGPT):
+    """ChatGPTProxy is a ChatGPT used by MultiChatGPT."""
+
+    def __init__(self, session_id: str, config: ChatGPTConfig, create_now=True):
+        """A ChatGPTProxy is represent to a session of MultiChatGPT.
+        (Maybe I should rename it ChatGPTSession.)
+
+
+        ChatGPTProxy saves the config and use it to create a new 
+        underlying ChatGTP instance.
+
+        The ask() call will be proxy to the underlying ChatGPT.
+
+        renew() drops the underlying ChatGPT and create a new one
+        using the saved config. This is designed to kill a ChatGPT
+        session (to the openai's api), but keeps the session (w.r.t. 
+        the MultiChatGPT & the ChatbotServer).
+        It avoids loooong conversations (which holding tons of history context)
+        accumulates and costs tokens ($0.002 / 1K tokens) over and over again.
+        """
+        self.session_id = session_id
+        self.config = config
+
+        self.initial_response = ""
+
+        if create_now:
+            self.renew()
+
+    def renew(self):
+        """re-create the underlying (real) ChatGPT instance"""
+        self.chatgpt = self._new_chatgpt(self.config)
+        self.create_at = time.time()
+
+    def _new_chatgpt(self, config: ChatGPTConfig) -> ChatGPT:
+        """ChatGPT factory"""
+        if config.version == APIVersion.V3:
+            new_chatgpt = ChatGPTv3(config={
+                "api_key": config.access_token,
+                "initial_prompt": config.initial_prompt
+            })
+        else:
+            new_chatgpt = ChatGPTv1(config={
+                "access_token": config.access_token,
+                "initial_prompt": config.initial_prompt
+            })
+
+        try:
+            self.initial_response = new_chatgpt.initial_response or ""
+        except Exception as e:
+            logging.error(
+                f"ChatGPTProxy._new_chatgpt failed to get initial_response: {e}")
+        return new_chatgpt
+
+    def ask(self, session_id, prompt, **kwargs):
+        """ask the underlying (real) ChatGPT"""
+        return self.chatgpt.ask(session_id, prompt, **kwargs)
+
+
 # MultiChatGPT: {session_id: ChatGPT}:
 #  - new(config) -> session_id
 #  - ask(session_id, prompt) -> response
@@ -158,9 +217,24 @@ class MultiChatGPT(ChatGPT):
     """MultiChatGPT: {session_id: ChatGPT}"""
 
     def __init__(self):
-        self.chatgpt: Dict[str, ChatGPT] = {}  # XXX: 话说这东西线程安全嘛
+        self.chatgpts: Dict[str, ChatGPTProxy] = {}  # XXX: 话说这东西线程安全嘛
 
-    def new(self, config: ChatGPTConfig) -> str:  # raises TooManySessions, ChatGPTError
+        self.timeout = 900  # timeout in seconds: 15 min
+        self.check_timeout_interval = 60  # interval time to check timeout session in sec
+
+        Timer(self.check_timeout_interval, self.clean_timeout_session).start()
+
+    def clean_timeout_session(self):
+        now = time.time()
+        for chatgpt in self.chatgpts.values():
+            if now - chatgpt.create_at > self.timeout:
+                logging.info(
+                    f"MultiChatGPT: renew a timeout ChatGPT session {chatgpt.session_id}")
+                chatgpt.renew()
+        Timer(self.check_timeout_interval, self.clean_timeout_session).start()
+
+    # raises TooManySessions, ChatGPTError
+    def new_session(self, config: ChatGPTConfig) -> str:
         """Create new ChatGPT session, return session_id
 
         session_id is an uuid4 string
@@ -169,21 +243,13 @@ class MultiChatGPT(ChatGPT):
             TooManySessions: Too many sessions
             ChatGPTError: ChatGPT error when asking initial prompt
         """
-        if len(self.chatgpt) >= MAX_SESSIONS:
+        if len(self.chatgpts) >= MAX_SESSIONS:
             raise TooManySessions(MAX_SESSIONS)
 
         session_id = str(uuid.uuid4())
 
-        if config.version == APIVersion.V3:
-            self.chatgpt[session_id] = ChatGPTv3(config={
-                "api_key": config.access_token,
-                "initial_prompt": config.initial_prompt
-            })
-        else:
-            self.chatgpt[session_id] = ChatGPTv1(config={
-                "access_token": config.access_token,
-                "initial_prompt": config.initial_prompt
-            })
+        self.chatgpts[session_id] = ChatGPTProxy(
+            session_id, config, create_now=True)
 
         return session_id
 
@@ -194,10 +260,10 @@ class MultiChatGPT(ChatGPT):
             SessionNotFound: Session not found
             ChatGPTError: ChatGPT error when asking
         """
-        if session_id not in self.chatgpt:
+        if session_id not in self.chatgpts:
             raise SessionNotFound(session_id)
 
-        resp = self.chatgpt[session_id].ask(session_id, prompt)
+        resp = self.chatgpts[session_id].ask(session_id, prompt)
 
         return resp
 
@@ -207,10 +273,10 @@ class MultiChatGPT(ChatGPT):
         Raises:
             SessionNotFound: Session not found
         """
-        if session_id not in self.chatgpt:
+        if session_id not in self.chatgpts:
             raise SessionNotFound(session_id)
 
-        del self.chatgpt[session_id]
+        del self.chatgpts[session_id]
 
 
 # Exceptions: TooManySessions, SessionNotFound, ChatGPTError

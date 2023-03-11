@@ -34,7 +34,7 @@ class ChatGPTgRPCServer(chatbot_pb2_grpc.ChatbotServiceServicer):
 
         session_id = None
         try:
-            session_id = self.multiChatGPT.new(config)
+            session_id = self.multiChatGPT.new_session(config)
         except TooManySessions as e:
             context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             context.set_details(str(e))
@@ -50,7 +50,7 @@ class ChatGPTgRPCServer(chatbot_pb2_grpc.ChatbotServiceServicer):
                 f'ChatGPTgRPCServer.NewSession: (OK) session_id={session_id}')
 
         # TODO: 这个 initial_response 太恶心了，还是逐层传比较好吧
-        return chatbot_pb2.NewSessionResponse(session_id=session_id, initial_response=self.multiChatGPT.chatgpt[session_id].initial_response)
+        return chatbot_pb2.NewSessionResponse(session_id=session_id, initial_response=self.multiChatGPT.chatgpts[session_id].initial_response)
 
     def Chat(self, request, context):
         """Chat sends a prompt to ChatGPT and receives a response.

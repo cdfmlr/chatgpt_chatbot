@@ -50,7 +50,7 @@ class ChatGPTv1(ChatGPT):
         else:
             self.initial_response = None
 
-    @cooldown(os.getenv("CHATGPT_COOLDOWN", 75))
+    @cooldown(int(os.getenv("CHATGPT_COOLDOWN", 75)))
     def ask(self, session_id, prompt, **kwargs) -> str:  # raises Exception
         """Ask ChatGPT with prompt, return response text
 
@@ -105,7 +105,7 @@ class ChatGPTv3(ChatGPT):
     # 主要是价格w
     # gpt-3.5-turbo: $0.002 / 1K tokens
 
-    @cooldown(os.getenv("CHATGPT_V3_COOLDOWN", 30))
+    @cooldown(int(os.getenv("CHATGPT_V3_COOLDOWN", 30)))
     def ask(self, session_id, prompt, **kwargs) -> str:  # raises Exception
         """Ask ChatGPT with prompt, return response text
 

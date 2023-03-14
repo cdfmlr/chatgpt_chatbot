@@ -240,7 +240,7 @@ class MultiChatGPT(ChatGPT):
         now = time.time()
         for chatgpt in self.chatgpts.values():
             if chatgpt.is_zombie(timeout=self.timeout*2):
-                logging.info(f"MultiChatGPT: zombie chatgpt: {chatgpt.session_id}, skip renew.")
+                logging.debug(f"MultiChatGPT: zombie chatgpt: {chatgpt.session_id}, skip renew.")
                 continue
             if chatgpt.is_timeout(timeout=self.timeout):
                 logging.info(f"MultiChatGPT: renew a timeout ChatGPT session {chatgpt.session_id}")

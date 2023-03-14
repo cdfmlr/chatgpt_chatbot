@@ -176,6 +176,9 @@ class ChatGPTProxy(ChatGPT):
 
         self.initial_response = ""
 
+        self.create_at = 0
+        self.touch_at = 0
+
         if create_now:
             self.renew()
 
@@ -183,6 +186,14 @@ class ChatGPTProxy(ChatGPT):
         """re-create the underlying (real) ChatGPT instance"""
         self.chatgpt = self._new_chatgpt(self.config)
         self.create_at = time.time()
+
+    def is_timeout(self, timeout=900):
+        """timeout: to be renew()"""
+        return time.time() - self.create_at > timeout
+
+    def is_zombie(self, timeout=1800):
+        """zombie: do not renew()"""
+        return time.time() - self.touch_at > timeout
 
     def _new_chatgpt(self, config: ChatGPTConfig) -> ChatGPT:
         """ChatGPT factory"""
@@ -206,6 +217,7 @@ class ChatGPTProxy(ChatGPT):
 
     def ask(self, session_id, prompt, **kwargs):
         """ask the underlying (real) ChatGPT"""
+        self.touch_at = time.time()
         return self.chatgpt.ask(session_id, prompt, **kwargs)
 
 
@@ -222,16 +234,27 @@ class MultiChatGPT(ChatGPT):
         self.timeout = 900  # timeout in seconds: 15 min
         self.check_timeout_interval = 60  # interval time to check timeout session in sec
 
-        Timer(self.check_timeout_interval, self.clean_timeout_session).start()
+        Timer(self.check_timeout_interval, self.renew_timeout_sessions).start()
 
-    def clean_timeout_session(self):
+    def renew_timeout_sessions(self):
         now = time.time()
         for chatgpt in self.chatgpts.values():
-            if now - chatgpt.create_at > self.timeout:
-                logging.info(
-                    f"MultiChatGPT: renew a timeout ChatGPT session {chatgpt.session_id}")
+            if chatgpt.is_zombie(timeout=self.timeout*2):
+                logging.info(f"MultiChatGPT: zombie chatgpt: {chatgpt.session_id}, skip renew.")
+                continue
+            if chatgpt.is_timeout(timeout=self.timeout):
+                logging.info(f"MultiChatGPT: renew a timeout ChatGPT session {chatgpt.session_id}")
                 chatgpt.renew()
-        Timer(self.check_timeout_interval, self.clean_timeout_session).start()
+        Timer(self.check_timeout_interval, self.renew_timeout_sessions).start()
+
+    def clean_zombie_sessions(self):
+        session_ids_to_del = []
+        for chatgpt in self.chatgpts.values():
+            if chatgpt.is_zombie(timeout=self.timeout*2):
+                session_ids_to_del.append(chatgpt.session_id)
+        logging.info(f"MultiChatGPT: delete zombie chatgpts: {session_ids_to_del}")
+        for s in session_ids_to_del:
+            self.delete(s)
 
     # raises TooManySessions, ChatGPTError
     def new_session(self, config: ChatGPTConfig) -> str:
@@ -243,6 +266,8 @@ class MultiChatGPT(ChatGPT):
             TooManySessions: Too many sessions
             ChatGPTError: ChatGPT error when asking initial prompt
         """
+        if len(self.chatgpts) >= MAX_SESSIONS:
+            self.clean_zombie_sessions()
         if len(self.chatgpts) >= MAX_SESSIONS:
             raise TooManySessions(MAX_SESSIONS)
 

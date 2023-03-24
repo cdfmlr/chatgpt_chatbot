@@ -237,24 +237,31 @@ class MultiChatGPT(ChatGPT):
         Timer(self.check_timeout_interval, self.renew_timeout_sessions).start()
 
     def renew_timeout_sessions(self):
-        now = time.time()
-        for chatgpt in self.chatgpts.values():
-            if chatgpt.is_zombie(timeout=self.timeout*2):
-                logging.debug(f"MultiChatGPT: zombie chatgpt: {chatgpt.session_id}, skip renew.")
-                continue
-            if chatgpt.is_timeout(timeout=self.timeout):
-                logging.info(f"MultiChatGPT: renew a timeout ChatGPT session {chatgpt.session_id}")
-                chatgpt.renew()
-        Timer(self.check_timeout_interval, self.renew_timeout_sessions).start()
+        try:
+            now = time.time()
+            for chatgpt in self.chatgpts.values():
+                if chatgpt.is_zombie(timeout=self.timeout*2):
+                    logging.debug(f"MultiChatGPT: zombie chatgpt: {chatgpt.session_id}, skip renew.")
+                    continue
+                if chatgpt.is_timeout(timeout=self.timeout):
+                    logging.info(f"MultiChatGPT: renew a timeout ChatGPT session {chatgpt.session_id}")
+                    chatgpt.renew()
+        except Exception as e:
+            logging.error(f"MultiChatGPT: renew_timeout_sessions error: {e}")
+        finally:
+            Timer(self.check_timeout_interval, self.renew_timeout_sessions).start()
 
     def clean_zombie_sessions(self):
-        session_ids_to_del = []
-        for chatgpt in self.chatgpts.values():
-            if chatgpt.is_zombie(timeout=self.timeout*2):
-                session_ids_to_del.append(chatgpt.session_id)
-        logging.info(f"MultiChatGPT: delete zombie chatgpts: {session_ids_to_del}")
-        for s in session_ids_to_del:
-            self.delete(s)
+        try:
+            session_ids_to_del = []
+            for chatgpt in self.chatgpts.values():
+                if chatgpt.is_zombie(timeout=self.timeout*2):
+                    session_ids_to_del.append(chatgpt.session_id)
+            logging.info(f"MultiChatGPT: delete zombie chatgpts: {session_ids_to_del}")
+            for s in session_ids_to_del:
+                self.delete(s)
+        except Exception as e:
+            logging.error(f"MultiChatGPT: clean_zombie_sessions error: {e}")
 
     # raises TooManySessions, ChatGPTError
     def new_session(self, config: ChatGPTConfig) -> str:

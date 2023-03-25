@@ -20,6 +20,14 @@ COPY pyproject.toml poetry.lock ./
 RUN poetry config virtualenvs.create false && \
     poetry install --no-dev --no-interaction --no-ansi --no-root
 
+
+# Arm64 wheel contains a debug / non stripped version of the .so library
+# - https://github.com/grpc/grpc/issues/29935
+# - https://command-not-found.com/strip
+RUN test $(uname -m) = 'aarch64' && \
+	apt-get install -y binutils && \
+	strip -s -g -S -d --strip-debug /usr/local/lib/python3.10/site-packages/grpc/_cython/cygrpc.cpython-310-aarch64-linux-gnu.so
+
 # Copy the source code
 COPY . .
 

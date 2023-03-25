@@ -93,7 +93,8 @@ class ChatGPTv3(ChatGPT):
                 'You are muvtuber, a cute vtuber live streaming'
         self.chatbot = ChatbotV3(
                 api_key=config.get('api_key', ''), 
-                # timeout=30,  # TODO: update to acheong08/ChatGPT#1199
+                max_tokens=3000,  # 太长容易忘记 system_prompt
+                # timeout=30,     # TODO: update to acheong08/ChatGPT#1199
                 system_prompt=system_prompt)
         self.lock = threading.Lock()  # for self.chatbot
 

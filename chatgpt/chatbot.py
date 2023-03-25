@@ -88,24 +88,29 @@ class ChatGPTv1(ChatGPT):
 # V3 Official Chat API
 # Paid
 class ChatGPTv3(ChatGPT):
-    def __init__(self, config={'api_key': 'your api key', 'initial_prompt': 'your initial prompt'}):
-        self.chatbot = ChatbotV3(api_key=config.get('api_key', ''))
+    def __init__(self, config={'api_key': 'your api key', 'initial_prompt': ''}):
+        system_prompt = config.get('initial_prompt', None) or \
+                'You are muvtuber, a cute vtuber live streaming'
+        self.chatbot = ChatbotV3(
+                api_key=config.get('api_key', ''), 
+                # timeout=30,  # TODO: update to acheong08/ChatGPT#1199
+                system_prompt=system_prompt)
         self.lock = threading.Lock()  # for self.chatbot
 
-        q = config.get('initial_prompt', None)
-        if q:
-            a = self.ask('', q, no_cooldown=True)
-            logging.info(f'ChatGPT initial ask: {q} -> {a}')
-            self.initial_response = a
-        else:
-            self.initial_response = None
+        # q = config.get('initial_prompt', None)
+        # if q:
+        #     a = self.ask('', q, no_cooldown=True)
+        #     logging.info(f'ChatGPT initial ask: {q} -> {a}')
+        #     self.initial_response = a
+        # else:
+        #     self.initial_response = None
 
     # Rate Limits: 20 RPM / 40,000 TPM
     # https://platform.openai.com/docs/guides/rate-limits/overview
     # 主要是价格w
     # gpt-3.5-turbo: $0.002 / 1K tokens
 
-    @cooldown(int(os.getenv("CHATGPT_V3_COOLDOWN", 30)))
+    @cooldown(int(os.getenv("CHATGPT_V3_COOLDOWN", 15)))
     def ask(self, session_id, prompt, **kwargs) -> str:  # raises Exception
         """Ask ChatGPT with prompt, return response text
 
@@ -201,18 +206,18 @@ class ChatGPTProxy(ChatGPT):
             new_chatgpt = ChatGPTv3(config={
                 "api_key": config.access_token,
                 "initial_prompt": config.initial_prompt
-            })
+                })
         else:
             new_chatgpt = ChatGPTv1(config={
                 "access_token": config.access_token,
                 "initial_prompt": config.initial_prompt
-            })
+                })
 
         try:
             self.initial_response = new_chatgpt.initial_response or ""
         except Exception as e:
-            logging.error(
-                f"ChatGPTProxy._new_chatgpt failed to get initial_response: {e}")
+            logging.warning(
+                    f"ChatGPTProxy._new_chatgpt failed to get initial_response: {e}")
         return new_chatgpt
 
     def ask(self, session_id, prompt, **kwargs):
@@ -281,7 +286,7 @@ class MultiChatGPT(ChatGPT):
         session_id = str(uuid.uuid4())
 
         self.chatgpts[session_id] = ChatGPTProxy(
-            session_id, config, create_now=True)
+                session_id, config, create_now=True)
 
         return session_id
 

@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-revchatgpt = "^3.0.0"
+revchatgpt = "^4.0.0"
 aiohttp = "^3.8.4"
 protobuf = "^4.22.0"
 grpcio = "^1.51.3"

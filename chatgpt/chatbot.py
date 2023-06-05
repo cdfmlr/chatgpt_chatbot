@@ -13,6 +13,35 @@ import threading
 from datetime import datetime
 from threading import Timer
 from cooldown import cooldown
+import re # added for emoji filter
+
+
+def filter_emoji(text): # emoji filter
+    emoji_pattern = re.compile("["
+    u"\U0001F600-\U0001F64F"  # emoticons
+    u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+    u"\U0001F680-\U0001F6FF"  # transport & map symbols
+    u"\U0001F1E0-\U0001F1FF"  # flags
+    u"\U0001F910-\U0001F95F"  # people & body
+    u"\U00002600-\U000027BF"  # dingbats
+    u"\U000026A0-\U000026FF"  # misc symbols
+    u"\U0000FE0F"             # emoji variation selector
+    u"\u2640-\u2642"          # gender symbols
+        "]+", flags=re.UNICODE)
+    filtered_text = re.sub(emoji_pattern, '', text)
+    return filtered_text
+
+def filter_emoticons(text): # emoticon filter :( :D :P :O :o ;) :| :/ :\ :^) :'( :_ :S :@ :x :X :\$ :# :%
+    emoticon_pattern = r'(?::|;|=)(?:-)?(?:\)|\(|D|P|O|o|\[|\]|3|>|<|\/|\||\\|\^|\'|_|S|@|x|X|\$|#|%)'
+    filtered_text = re.sub(emoticon_pattern, '', text)
+    return filtered_text
+
+def filter_response(text): 
+    text = str(text)
+    filtered_text = filter_emoji(text)
+    filtered_text = filter_emoticons(filtered_text)
+    return filtered_text
+
 
 # Proxy server Rate limit: 25 requests per 10 seconds (per IP)
 # OpenAI rate limit: 50 requests per hour on free accounts. You can get around it with multi-account cycling
@@ -132,7 +161,8 @@ class ChatGPTv3(ChatGPT):
         if not response:
             raise ChatGPTError("ChatGPT response is None")
 
-        return response
+        filteredemoji_resp = filter_response(response) #filter emoji on response
+        return filteredemoji_resp #return filtered message
 
 
 class APIVersion(Enum):
